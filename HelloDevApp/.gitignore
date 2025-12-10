@@ -1,0 +1,31 @@
+# Android Studio / IntelliJ
+*.iml
+.idea/
+.DS_Store
+local.properties
+
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Captures & CMake
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Apk & Output files
+*.apk
+*.ap_
+*.aab
+
+# Generated files
+*.class
+*.dex
+
+# Kotlin
+*.kotlin_module
+
+# OS Files
+Thumbs.db
+*.hprof
