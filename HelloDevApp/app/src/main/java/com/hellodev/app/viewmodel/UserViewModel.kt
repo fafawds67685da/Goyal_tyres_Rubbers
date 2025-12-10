@@ -5,9 +5,7 @@ import android.os.Environment
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.hellodev.app.data.AppDatabase
-import com.hellodev.app.data.User
-import com.hellodev.app.data.UserRepository
+import com.hellodev.app.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,11 +16,28 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
-class UserViewModel(application: Application) : AndroidViewModel(application) {
+class InventoryViewModel(application: Application) : AndroidViewModel(application) {
     
-    private val repository: UserRepository
-    private val _users = MutableStateFlow<List<User>>(emptyList())
-    val users: StateFlow<List<User>> = _users.asStateFlow()
+    private val stockRepository: StockRepository
+    private val saleRepository: SaleRepository
+    
+    private val _stocks = MutableStateFlow<List<RubberStock>>(emptyList())
+    val stocks: StateFlow<List<RubberStock>> = _stocks.asStateFlow()
+    
+    private val _sales = MutableStateFlow<List<Sale>>(emptyList())
+    val sales: StateFlow<List<Sale>> = _sales.asStateFlow()
+    
+    private val _totalRolls = MutableStateFlow(0)
+    val totalRolls: StateFlow<Int> = _totalRolls.asStateFlow()
+    
+    private val _totalWeight = MutableStateFlow(0.0)
+    val totalWeight: StateFlow<Double> = _totalWeight.asStateFlow()
+    
+    private val _stockByType = MutableStateFlow<List<StockByType>>(emptyList())
+    val stockByType: StateFlow<List<StockByType>> = _stockByType.asStateFlow()
+    
+    private val _totalRevenue = MutableStateFlow(0.0)
+    val totalRevenue: StateFlow<Double> = _totalRevenue.asStateFlow()
     
     private val _exportPath = MutableStateFlow<String>("")
     val exportPath: StateFlow<String> = _exportPath.asStateFlow()
@@ -31,26 +46,81 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
     
     init {
         val database = AppDatabase.getDatabase(application)
-        repository = UserRepository(database.userDao())
-        dbPath = application.getDatabasePath("user_database").absolutePath
+        stockRepository = StockRepository(database.stockDao())
+        saleRepository = SaleRepository(database.saleDao())
+        dbPath = application.getDatabasePath("rubber_inventory_database").absolutePath
         
         viewModelScope.launch {
-            repository.allUsers.collect { userList ->
-                _users.value = userList
+            stockRepository.allStock.collect { stockList ->
+                _stocks.value = stockList
+            }
+        }
+        
+        viewModelScope.launch {
+            stockRepository.totalRolls.collect { total ->
+                _totalRolls.value = total ?: 0
+            }
+        }
+        
+        viewModelScope.launch {
+            stockRepository.totalWeight.collect { total ->
+                _totalWeight.value = total ?: 0.0
+            }
+        }
+        
+        viewModelScope.launch {
+            stockRepository.stockByType.collect { types ->
+                _stockByType.value = types
+            }
+        }
+        
+        viewModelScope.launch {
+            saleRepository.allSales.collect { salesList ->
+                _sales.value = salesList
+            }
+        }
+        
+        viewModelScope.launch {
+            saleRepository.totalRevenue.collect { revenue ->
+                _totalRevenue.value = revenue ?: 0.0
             }
         }
     }
     
-    fun insertUser(name: String, age: Int) {
+    fun insertStock(rubberName: String, numberOfRolls: Int, weightInKg: Double, costOfStock: Double) {
         viewModelScope.launch {
-            val user = User(name = name, age = age)
-            repository.insert(user)
+            val stock = RubberStock(
+                rubberName = rubberName,
+                numberOfRolls = numberOfRolls,
+                weightInKg = weightInKg,
+                costOfStock = costOfStock
+            )
+            stockRepository.insert(stock)
         }
     }
     
-    fun clearAllUsers() {
+    fun insertSale(rubberName: String, numberOfRolls: Int, weightInKg: Double, soldFor: Double) {
         viewModelScope.launch {
-            repository.deleteAll()
+            val sale = Sale(
+                rubberName = rubberName,
+                numberOfRolls = numberOfRolls,
+                weightInKg = weightInKg,
+                soldFor = soldFor
+            )
+            saleRepository.insert(sale)
+        }
+    }
+    
+    fun clearAllStock() {
+        viewModelScope.launch {
+            // This will delete all records from the table
+            stockRepository.deleteAll()
+        }
+    }
+    
+    fun clearAllSales() {
+        viewModelScope.launch {
+            saleRepository.deleteAll()
         }
     }
     
@@ -58,11 +128,9 @@ class UserViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    // Get the Downloads directory
                     val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    val exportFile = File(downloadsDir, "user_database.db")
+                    val exportFile = File(downloadsDir, "rubber_inventory.db")
                     
-                    // Copy database file
                     val dbFile = File(dbPath)
                     if (dbFile.exists()) {
                         FileInputStream(dbFile).use { input ->
