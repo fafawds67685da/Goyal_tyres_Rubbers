@@ -14,8 +14,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -216,20 +218,23 @@ fun DrawerContent(currentScreen: Screen, onNavigate: (Screen) -> Unit) {
     
     ModalDrawerSheet {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
             Text(
                 text = "Goyal Tyres & Rubbers",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 24.dp)
+                modifier = Modifier.padding(16.dp).padding(vertical = 8.dp)
             )
             
             Divider()
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            ) {
             
             // AI Assistant
             DrawerItem(
@@ -305,17 +310,18 @@ fun DrawerContent(currentScreen: Screen, onNavigate: (Screen) -> Unit) {
                     onClick = { onNavigate(Screen.StockCategories) }
                 )
             }
+            
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            
+            // History
+            DrawerItem(
+                icon = Icons.Default.DateRange,
+                label = "History",
+                isSelected = currentScreen == Screen.History,
+                onClick = { onNavigate(Screen.History) }
+            )
+            }
         }
-        
-        Divider(modifier = Modifier.padding(vertical = 8.dp))
-        
-        // History
-        DrawerItem(
-            icon = Icons.Default.DateRange,
-            label = "History",
-            isSelected = currentScreen == Screen.History,
-            onClick = { onNavigate(Screen.History) }
-        )
     }
 }
 
