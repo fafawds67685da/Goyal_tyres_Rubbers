@@ -44,10 +44,10 @@ import androidx.navigation.compose.rememberNavController
 import com.hellodev.app.data.RubberStock
 import com.hellodev.app.data.Sale
 import com.hellodev.app.data.StockCategory
+import com.hellodev.app.data.PaymentType
 import com.hellodev.app.navigation.Screen
 import com.hellodev.app.screens.*
-import com.hellodev.app.ui.EnhancedPieChart
-import com.hellodev.app.ui.StatCard
+import com.hellodev.app.ui.*
 import com.hellodev.app.ui.theme.HelloDevAppTheme
 import com.hellodev.app.utils.NumberFormatter
 import com.hellodev.app.viewmodel.DateFilter
@@ -112,6 +112,9 @@ fun MainScreen(navController: NavHostController, viewModel: InventoryViewModel) 
                 Screen.AddStock.route -> Screen.AddStock
                 Screen.StockCategories.route -> Screen.StockCategories
                 Screen.History.route -> Screen.History
+                Screen.Calendar.route -> Screen.Calendar
+                Screen.Payments.route -> Screen.Payments
+                Screen.Notes.route -> Screen.Notes
                 else -> Screen.Dashboard
             }
     
@@ -204,6 +207,73 @@ fun MainScreen(navController: NavHostController, viewModel: InventoryViewModel) 
                         onCommitSuccess = { 
                             navController.popBackStack(Screen.StockDrafts.route, inclusive = false)
                         }
+                    )
+                }
+                
+                // Calendar screens
+                composable(Screen.Calendar.route) {
+                    CalendarScreen(
+                        onAddEvent = { navController.navigate(Screen.AddEvent.route) },
+                        onEditEvent = { eventId -> navController.navigate(Screen.EditEvent.createRoute(eventId)) }
+                    )
+                }
+                composable(Screen.AddEvent.route) {
+                    AddEditEventScreen(
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(Screen.EditEvent.route) { backStackEntry ->
+                    val eventId = backStackEntry.arguments?.getString("eventId")?.toIntOrNull()
+                    AddEditEventScreen(
+                        eventId = eventId,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                
+                // Payment screens
+                composable(Screen.Payments.route) {
+                    PaymentsScreen(
+                        onAddPayment = { type -> navController.navigate(Screen.AddPayment.createRoute(type.name)) },
+                        onPaymentClick = { paymentId -> navController.navigate(Screen.PaymentDetails.createRoute(paymentId)) }
+                    )
+                }
+                composable(Screen.AddPayment.route) { backStackEntry ->
+                    val typeString = backStackEntry.arguments?.getString("type") ?: "INCOMING"
+                    val paymentType = try {
+                        PaymentType.valueOf(typeString)
+                    } catch (e: Exception) {
+                        PaymentType.INCOMING
+                    }
+                    AddPaymentScreen(
+                        paymentType = paymentType,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(Screen.PaymentDetails.route) { backStackEntry ->
+                    val paymentId = backStackEntry.arguments?.getString("paymentId")?.toIntOrNull() ?: 0
+                    PaymentDetailsScreen(
+                        paymentId = paymentId,
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                
+                // Notes screens
+                composable(Screen.Notes.route) {
+                    NotesScreen(
+                        onAddNote = { navController.navigate(Screen.AddNote.route) },
+                        onEditNote = { noteId -> navController.navigate(Screen.EditNote.createRoute(noteId)) }
+                    )
+                }
+                composable(Screen.AddNote.route) {
+                    AddEditNoteScreen(
+                        onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(Screen.EditNote.route) { backStackEntry ->
+                    val noteId = backStackEntry.arguments?.getString("noteId")?.toIntOrNull()
+                    AddEditNoteScreen(
+                        noteId = noteId,
+                        onBack = { navController.popBackStack() }
                     )
                 }
             }
@@ -319,6 +389,30 @@ fun DrawerContent(currentScreen: Screen, onNavigate: (Screen) -> Unit) {
                 label = "History",
                 isSelected = currentScreen == Screen.History,
                 onClick = { onNavigate(Screen.History) }
+            )
+            
+            // Calendar
+            DrawerItem(
+                icon = Icons.Default.CalendarToday,
+                label = "Calendar",
+                isSelected = currentScreen == Screen.Calendar,
+                onClick = { onNavigate(Screen.Calendar) }
+            )
+            
+            // Payments
+            DrawerItem(
+                icon = Icons.Default.Payment,
+                label = "Payments",
+                isSelected = currentScreen == Screen.Payments,
+                onClick = { onNavigate(Screen.Payments) }
+            )
+            
+            // Notes
+            DrawerItem(
+                icon = Icons.Default.Note,
+                label = "Notes",
+                isSelected = currentScreen == Screen.Notes,
+                onClick = { onNavigate(Screen.Notes) }
             )
             }
         }
