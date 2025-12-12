@@ -10,4 +10,12 @@ sealed class Screen(val route: String, val title: String) {
     object StockCategories : Screen("stock_categories", "Stock Categories")
     object AIAssistant : Screen("ai_assistant", "AI Assistant")
     object History : Screen("history", "History")
+    object StockDrafts : Screen("stock_drafts", "Stock Drafts")
+    object CreateDraft : Screen("create_draft", "Create Draft")
+    object EditDraft : Screen("edit_draft/{draftId}", "Edit Draft") {
+        fun createRoute(draftId: Int) = "edit_draft/$draftId"
+    }
+    object DraftSummary : Screen("draft_summary/{draftId}", "Draft Summary") {
+        fun createRoute(draftId: Int) = "draft_summary/$draftId"
+    }
 }

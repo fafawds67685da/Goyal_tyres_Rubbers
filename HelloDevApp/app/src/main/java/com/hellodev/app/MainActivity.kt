@@ -83,6 +83,9 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val viewModel: InventoryViewModel = viewModel()
                 
+                // Check for app updates
+                UpdateChecker(context = this)
+                
                 MainScreen(navController = navController, viewModel = viewModel)
             }
         }
@@ -161,6 +164,46 @@ fun MainScreen(navController: NavHostController, viewModel: InventoryViewModel) 
                 composable(Screen.AddStock.route) { AddStockScreen(viewModel, navController) }
                 composable(Screen.StockCategories.route) { StockCategoriesScreen(viewModel) }
                 composable(Screen.History.route) { HistoryScreen(viewModel) }
+                
+                // Draft screens
+                composable(Screen.StockDrafts.route) { 
+                    com.hellodev.app.ui.screens.StockDraftListScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = { navController.popBackStack() },
+                        onCreateDraft = { navController.navigate(Screen.CreateDraft.route) },
+                        onEditDraft = { draftId -> navController.navigate(Screen.EditDraft.createRoute(draftId)) }
+                    )
+                }
+                composable(Screen.CreateDraft.route) {
+                    com.hellodev.app.ui.screens.CreateDraftScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = { navController.popBackStack() },
+                        onDraftCreated = { draftId -> 
+                            navController.popBackStack()
+                            navController.navigate(Screen.EditDraft.createRoute(draftId))
+                        }
+                    )
+                }
+                composable(Screen.EditDraft.route) { backStackEntry ->
+                    val draftId = backStackEntry.arguments?.getString("draftId")?.toIntOrNull() ?: 0
+                    com.hellodev.app.ui.screens.StockDraftEditorScreen(
+                        viewModel = viewModel,
+                        draftId = draftId,
+                        onNavigateBack = { navController.popBackStack() },
+                        onViewSummary = { id -> navController.navigate(Screen.DraftSummary.createRoute(id)) }
+                    )
+                }
+                composable(Screen.DraftSummary.route) { backStackEntry ->
+                    val draftId = backStackEntry.arguments?.getString("draftId")?.toIntOrNull() ?: 0
+                    com.hellodev.app.ui.screens.DraftSummaryScreen(
+                        viewModel = viewModel,
+                        draftId = draftId,
+                        onNavigateBack = { navController.popBackStack() },
+                        onCommitSuccess = { 
+                            navController.popBackStack(Screen.StockDrafts.route, inclusive = false)
+                        }
+                    )
+                }
             }
         }
     }
@@ -246,6 +289,11 @@ fun DrawerContent(currentScreen: Screen, onNavigate: (Screen) -> Unit) {
             )
             
             if (stockExpanded) {
+                DrawerSubItem(
+                    label = "Stock Drafts",
+                    isSelected = currentScreen == Screen.StockDrafts,
+                    onClick = { onNavigate(Screen.StockDrafts) }
+                )
                 DrawerSubItem(
                     label = "Add Stock",
                     isSelected = currentScreen == Screen.AddStock,
@@ -335,6 +383,96 @@ fun DrawerSubItem(label: String, isSelected: Boolean, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
             )
+        }
+    }
+}
+
+@Composable
+fun UpdateChecker(context: android.content.Context) {
+    val prefs = remember { context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE) }
+    val currentVersion = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionCode
+        } catch (e: Exception) {
+            1
+        }
+    }
+    
+    val lastKnownVersion = remember { prefs.getInt("last_version", 0) }
+    var showUpdateDialog by remember { mutableStateOf(lastKnownVersion > 0 && currentVersion > lastKnownVersion) }
+    
+    if (showUpdateDialog) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { 
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Update Available")
+                }
+            },
+            text = { 
+                Column {
+                    Text(
+                        "A new update has been injected into the app!",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Your existing data will be preserved. Would you like to apply the update now?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                "What's New:",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text("• Enhanced History with detailed records", style = MaterialTheme.typography.bodySmall)
+                            Text("• View stock additions and sales details", style = MaterialTheme.typography.bodySmall)
+                            Text("• Expandable transaction history", style = MaterialTheme.typography.bodySmall)
+                            Text("• Bug fixes and improvements", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        prefs.edit().putInt("last_version", currentVersion).apply()
+                        showUpdateDialog = false
+                    }
+                ) {
+                    Text("Update Now")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        prefs.edit().putInt("last_version", currentVersion).apply()
+                        showUpdateDialog = false
+                    }
+                ) {
+                    Text("Later")
+                }
+            }
+        )
+    } else if (lastKnownVersion == 0) {
+        // First launch - save current version
+        LaunchedEffect(Unit) {
+            prefs.edit().putInt("last_version", currentVersion).apply()
         }
     }
 }
