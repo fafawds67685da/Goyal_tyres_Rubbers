@@ -14,11 +14,17 @@ interface StockDao {
     @Update
     suspend fun updateStock(stock: RubberStock)
     
+    @androidx.room.Delete
+    suspend fun deleteStock(stock: RubberStock)
+    
     @Query("SELECT * FROM rubber_stock ORDER BY addedDate DESC")
     fun getAllStock(): Flow<List<RubberStock>>
     
     @Query("DELETE FROM rubber_stock")
     suspend fun deleteAllStock()
+    
+    @Query("DELETE FROM rubber_stock WHERE id = :stockId")
+    suspend fun deleteStockById(stockId: Int)
     
     @Query("SELECT SUM(numberOfRolls) FROM rubber_stock")
     fun getTotalRolls(): Flow<Int?>
