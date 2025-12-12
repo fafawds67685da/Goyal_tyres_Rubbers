@@ -76,21 +76,21 @@ class MainActivity : ComponentActivity() {
     
     private fun checkAndExport() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            viewModelInstance?.exportDatabase()
+            viewModelInstance?.exportToExcel()
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             when {
                 ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE
                 ) == PackageManager.PERMISSION_GRANTED -> {
-                    viewModelInstance?.exportDatabase()
+                    viewModelInstance?.exportToExcel()
                 }
                 else -> {
                     requestPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 }
             }
         } else {
-            viewModelInstance?.exportDatabase()
+            viewModelInstance?.exportToExcel()
         }
     }
 }
@@ -230,8 +230,9 @@ fun DashboardScreen(
     onExportClick: () -> Unit
 ) {
     val stocks by viewModel.stocks.collectAsState()
-    val totalRolls by viewModel.totalRolls.collectAsState()
-    val totalWeight by viewModel.totalWeight.collectAsState()
+    val availableRolls by viewModel.availableRolls.collectAsState()
+    val availableWeight by viewModel.availableWeight.collectAsState()
+    val totalStockWorth by viewModel.totalStockWorth.collectAsState()
     val stockByType by viewModel.stockByType.collectAsState()
     val totalRevenue by viewModel.totalRevenue.collectAsState()
     val exportPath by viewModel.exportPath.collectAsState()
@@ -248,17 +249,19 @@ fun DashboardScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                StatCard(
-                    title = "Total Rolls",
-                    value = totalRolls.toString(),
+                com.hellodev.app.ui.StatCard(
+                    title = "Available Rolls",
+                    value = availableRolls.toString(),
+                    subtitle = "After sales deduction",
                     icon = Icons.Default.Inventory,
                     color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.weight(1f)
                 )
                 
-                StatCard(
-                    title = "Total Weight",
-                    value = String.format("%.2f kg", totalWeight),
+                com.hellodev.app.ui.StatCard(
+                    title = "Available Weight",
+                    value = String.format("%.1f kg", availableWeight),
+                    subtitle = "After sales deduction",
                     icon = Icons.Default.Scale,
                     color = MaterialTheme.colorScheme.secondaryContainer,
                     modifier = Modifier.weight(1f)
@@ -267,32 +270,58 @@ fun DashboardScreen(
         }
         
         item {
-            StatCard(
-                title = "Total Revenue",
-                value = "₹" + String.format("%.2f", totalRevenue),
-                icon = Icons.Default.AttachMoney,
-                color = MaterialTheme.colorScheme.tertiaryContainer,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                com.hellodev.app.ui.StatCard(
+                    title = "Stock Worth",
+                    value = "₹" + String.format("%.0f", totalStockWorth),
+                    subtitle = "Total investment",
+                    icon = Icons.Default.AccountBalance,
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                com.hellodev.app.ui.StatCard(
+                    title = "Total Revenue",
+                    value = "₹" + String.format("%.0f", totalRevenue),
+                    subtitle = "All time sales",
+                    icon = Icons.Default.AttachMoney,
+                    color = Color(0xFF4CAF50).copy(alpha = 0.2f),
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
         
         // Pie Chart
         if (stockByType.isNotEmpty()) {
             item {
-                Card(
+                ElevatedCard(
                     modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(4.dp)
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(20.dp)
                     ) {
-                        Text(
-                            text = "Stock Distribution by Type",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        SimplePieChart(stockByType)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PieChart,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = "Stock Distribution by Type",
+                                fontSize = 19.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(20.dp))
+                        com.hellodev.app.ui.EnhancedPieChart(stockByType)
                     }
                 }
             }
@@ -302,14 +331,17 @@ fun DashboardScreen(
         item {
             Button(
                 onClick = {
-                    viewModel.exportDatabase()
+                    viewModel.exportToExcel()
                     onExportClick()
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
             ) {
-                Icon(Icons.Default.Download, null)
+                Icon(Icons.Default.TableChart, null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Export Database")
+                Text("Export to Excel")
             }
         }
         
@@ -345,114 +377,87 @@ fun DashboardScreen(
 }
 
 @Composable
-fun StatCard(
-    title: String,
-    value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = color),
-        elevation = CardDefaults.cardElevation(4.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(40.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column {
-                Text(
-                    text = title,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                Text(
-                    text = value,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SimplePieChart(data: List<com.hellodev.app.data.StockByType>) {
-    val total = data.sumOf { it.totalWeight }
-    val colors = listOf(
-        Color(0xFF6200EA),
-        Color(0xFF03DAC5),
-        Color(0xFFFF6F00),
-        Color(0xFFE91E63),
-        Color(0xFF4CAF50),
-        Color(0xFF2196F3)
-    )
-    
-    Column {
-        // Legend
-        data.forEachIndexed { index, item ->
-            val percentage = (item.totalWeight / total * 100).toInt()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(16.dp)
-                        .clip(CircleShape)
-                        .background(colors[index % colors.size])
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "${item.rubberName}: ${String.format("%.1f", item.totalWeight)}kg ($percentage%)",
-                    fontSize = 14.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
 fun StockCard(stock: com.hellodev.app.data.RubberStock) {
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(16.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     text = stock.rubberName,
                     fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text("Rolls: ${stock.numberOfRolls}", fontSize = 14.sp)
-                Text("Weight: ${stock.weightInKg} kg", fontSize = 14.sp)
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "₹${stock.costOfStock}",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     text = "#${stock.id}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        "Rolls: ${stock.numberOfRolls}",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "Weight: ${stock.weightInKg} kg",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Cost",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    Text(
+                        text = "₹${String.format("%.0f", stock.costOfStock)}",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Divider()
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Worth: ₹${String.format("%.0f", stock.stockWorth)}",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF4CAF50)
+                )
+                Text(
+                    text = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(stock.addedDate)),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -590,76 +595,156 @@ fun SalesScreen(
     viewModel: InventoryViewModel,
     navController: NavHostController
 ) {
-    val sales by viewModel.sales.collectAsState()
+    val filteredSales by viewModel.filteredSales.collectAsState()
+    val filteredRevenue by viewModel.filteredRevenue.collectAsState()
+    val selectedFilter by viewModel.selectedDateFilter.collectAsState()
     val dateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
     
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Sales Records (${sales.size})",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-            
-            IconButton(onClick = { navController.navigate(Screen.AddSale.route) }) {
-                Icon(Icons.Default.Add, "Add Sale", tint = MaterialTheme.colorScheme.primary)
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Sales Records",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                IconButton(onClick = { navController.navigate(Screen.AddSale.route) }) {
+                    Icon(Icons.Default.Add, "Add Sale", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+                }
             }
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        item {
+            com.hellodev.app.ui.StatCard(
+                title = "Revenue (${selectedFilter.name.replace("_", " ")})",
+                value = "₹${String.format("%.0f", filteredRevenue)}",
+                subtitle = "${filteredSales.size} sales",
+                icon = Icons.Default.TrendingUp,
+                color = Color(0xFF4CAF50).copy(alpha = 0.2f),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         
-        if (sales.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+        item {
+            ScrollableTabRow(
+                selectedTabIndex = com.hellodev.app.viewmodel.DateFilter.values().indexOf(selectedFilter),
+                modifier = Modifier.fillMaxWidth(),
+                edgePadding = 0.dp
             ) {
-                Text("No sales recorded yet", color = MaterialTheme.colorScheme.outline)
+                com.hellodev.app.viewmodel.DateFilter.values().forEach { filter ->
+                    Tab(
+                        selected = selectedFilter == filter,
+                        onClick = { viewModel.setDateFilter(filter) },
+                        text = {
+                            Text(
+                                filter.name.replace("_", " "),
+                                fontSize = 13.sp,
+                                fontWeight = if (selectedFilter == filter) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    )
+                }
+            }
+        }
+        
+        if (filteredSales.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No sales recorded for this period", color = MaterialTheme.colorScheme.outline)
+                }
             }
         } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(sales) { sale ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(2.dp)
+            items(filteredSales) { sale ->
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
+                            Text(
+                                text = sale.rubberName,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "₹${String.format("%.0f", sale.soldFor)}",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(24.dp)
+                        ) {
+                            Column {
                                 Text(
-                                    text = sale.rubberName,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold
+                                    "Rolls",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.outline
                                 )
                                 Text(
-                                    text = "₹${sale.soldFor}",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
+                                    sale.numberOfRolls.toString(),
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Rolls: ${sale.numberOfRolls}", fontSize = 14.sp)
-                                Text("Weight: ${sale.weightInKg} kg", fontSize = 14.sp)
+                            
+                            Column {
+                                Text(
+                                    "Weight",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                Text(
+                                    "${sale.weightInKg} kg",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Divider()
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = dateFormat.format(Date(sale.saleDate)),
                                 fontSize = 12.sp,

@@ -10,5 +10,9 @@ data class RubberStock(
     val rubberName: String,
     val numberOfRolls: Int,
     val weightInKg: Double,
-    val costOfStock: Double
-)
+    val costOfStock: Double,
+    val addedDate: Long = System.currentTimeMillis()
+) {
+    val stockWorth: Double
+        get() = costOfStock
+}

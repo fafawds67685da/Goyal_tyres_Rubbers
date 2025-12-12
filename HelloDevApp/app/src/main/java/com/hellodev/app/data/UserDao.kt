@@ -3,6 +3,7 @@ package com.hellodev.app.data
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -10,7 +11,10 @@ interface StockDao {
     @Insert
     suspend fun insertStock(stock: RubberStock)
     
-    @Query("SELECT * FROM rubber_stock ORDER BY id DESC")
+    @Update
+    suspend fun updateStock(stock: RubberStock)
+    
+    @Query("SELECT * FROM rubber_stock ORDER BY addedDate DESC")
     fun getAllStock(): Flow<List<RubberStock>>
     
     @Query("DELETE FROM rubber_stock")
@@ -22,8 +26,14 @@ interface StockDao {
     @Query("SELECT SUM(weightInKg) FROM rubber_stock")
     fun getTotalWeight(): Flow<Double?>
     
+    @Query("SELECT SUM(costOfStock) FROM rubber_stock")
+    fun getTotalStockWorth(): Flow<Double?>
+    
     @Query("SELECT rubberName, SUM(weightInKg) as totalWeight FROM rubber_stock GROUP BY rubberName")
     fun getStockByType(): Flow<List<StockByType>>
+    
+    @Query("SELECT * FROM rubber_stock WHERE rubberName = :name LIMIT 1")
+    suspend fun getStockByName(name: String): RubberStock?
 }
 
 data class StockByType(
